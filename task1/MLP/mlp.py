@@ -9,13 +9,19 @@ from PIL import Image
 from sklearn.metrics import precision_score, recall_score, f1_score
 import numpy as np
 import time
+import random
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 # hello world
 # =================配置参数=================
 CONFIG = {
     'input_size': 256,      # 调整尺寸以适应 MLP 和 4GB 显存
-    'batch_size': 64,       # 较小的 batch size 适应显存
+    'batch_size': 128,       # 较小的 batch size 适应显存
     'lr': 0.005,
-    'epochs': 30,
+    'epochs': 20,
     'device': 'cuda' ,
     'train_dir': 'D:\\table\ml\project\dataset_try\\train', 
     'test_dir': 'D:\\table\ml\project\dataset_try\\test' ,  
@@ -75,15 +81,20 @@ class GlassMLP(nn.Module):
         super(GlassMLP, self).__init__()
         # 这种深层宽结构有助于拟合，BN和Dropout防止过拟合
         self.net = nn.Sequential(
-            nn.Linear(input_dim, 1024),
+            nn.Linear(input_dim, 4096),
+            nn.BatchNorm1d(4096),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+
+            nn.Linear(4096, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            #nn.Dropout(0.4),
+            nn.Dropout(0.3),
             
             nn.Linear(1024, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(),
-            #nn.Dropout(0.3),
+            nn.Dropout(0.2),
             
             nn.Linear(256, 64),
             nn.BatchNorm1d(64),
@@ -123,6 +134,7 @@ def find_best_threshold(y_true, y_probs):
     return best_thresh, best_f1
 
 def train_and_evaluate():
+    set_seed(42)
     # 1. 准备数据
     train_dataset = GlassDataset(CONFIG['train_dir'], transform=transform)
     test_dataset = GlassDataset(CONFIG['test_dir'], transform=transform)
@@ -131,7 +143,7 @@ def train_and_evaluate():
     # 这里我们计算正负样本比例传给 Loss
     num_pos = sum([1 for _, label in train_dataset if label == 1])
     num_neg = len(train_dataset) - num_pos
-    pos_weight = torch.tensor([num_neg / num_pos]).to(CONFIG['device'])
+    pos_weight = torch.tensor([2.0*num_neg / num_pos]).to(CONFIG['device'])
     print(f"Dataset stats: Positive: {num_pos}, Negative: {num_neg}, Pos Weight: {pos_weight.item():.2f}")
     
     train_loader = DataLoader(train_dataset, batch_size=CONFIG['batch_size'], shuffle=True, num_workers=0)
@@ -188,8 +200,8 @@ def train_and_evaluate():
             
             print(f"Epoch {epoch+1}/{CONFIG['epochs']} | train Loss: {train_loss/len(train_loader):.4f} | test loss:{test_loss/len(test_loader):.4f} | "
                 f"Test F1: {f1:.4f} (P: {p:.4f}, R: {r:.4f})")
-            best_t, best_f1 = find_best_threshold(y_true, y_pred)
-            print(f"最佳阈值: {best_t}, 对应的最高 F1: {best_f1}")
+            #best_t, best_f1 = find_best_threshold(y_true, y_pred)
+            #print(f"最佳阈值: {best_t}, 对应的最高 F1: {best_f1}")
             if f1 > best_f1:
                 best_f1 = f1
                 # 保存模型，为后续手写 Task 1 做参考
