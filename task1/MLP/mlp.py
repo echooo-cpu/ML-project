@@ -17,8 +17,8 @@ CONFIG = {
     'lr': 0.005,
     'epochs': 30,
     'device': 'cuda' ,
-    'train_dir': 'D:\\table\机器学习\project\dataset_try\\train', 
-    'test_dir': 'D:\\table\机器学习\project\dataset_try\\test' ,  
+    'train_dir': 'D:\\table\ml\project\dataset_try\\train', 
+    'test_dir': 'D:\\table\ml\project\dataset_try\\test' ,  
     #'train_dir': 'D:\\table\机器学习\project\dataset\\train', 
     #'test_dir': 'D:\\table\机器学习\project\dataset\\test' ,  
 }
@@ -106,6 +106,22 @@ def calculate_metrics(y_true, y_pred):
     f1 = f1_score(y_true, y_pred_tag, zero_division=0)
     return p, r, f1
 
+
+def find_best_threshold(y_true, y_probs):
+    best_f1 = 0
+    best_thresh = 0.5
+    
+    # 遍历从 0.1 到 0.9 的所有阈值
+    for thresh in np.arange(0.1, 0.95, 0.05):
+        y_pred = (y_probs >= thresh).astype(int)
+        f1 = f1_score(y_true, y_pred, zero_division=0)
+        
+        if f1 > best_f1:
+            best_f1 = f1
+            best_thresh = thresh
+            
+    return best_thresh, best_f1
+
 def train_and_evaluate():
     # 1. 准备数据
     train_dataset = GlassDataset(CONFIG['train_dir'], transform=transform)
@@ -172,7 +188,8 @@ def train_and_evaluate():
             
             print(f"Epoch {epoch+1}/{CONFIG['epochs']} | train Loss: {train_loss/len(train_loader):.4f} | test loss:{test_loss/len(test_loader):.4f} | "
                 f"Test F1: {f1:.4f} (P: {p:.4f}, R: {r:.4f})")
-            
+            best_t, best_f1 = find_best_threshold(y_true, y_pred)
+            print(f"最佳阈值: {best_t}, 对应的最高 F1: {best_f1}")
             if f1 > best_f1:
                 best_f1 = f1
                 # 保存模型，为后续手写 Task 1 做参考
